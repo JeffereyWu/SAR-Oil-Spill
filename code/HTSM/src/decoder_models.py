@@ -36,13 +36,16 @@ class DeepLabV3Plus(nn.Module):
         aspp_out_channels=256, final_out_channels=256, aspp_dilate=[12, 24, 36]):
 
         super().__init__()
+        # 将编码器中的高级特征投影到与解码器或辅助特征对应的维度
         self.projection_conv = nn.Sequential(
             nn.Conv2d(encoder_channels, encoder_projection_channels, 1, bias=False),
             nn.BatchNorm2d(encoder_projection_channels),
             nn.ReLU(inplace=True),
         )
 
+        # 捕捉不同尺度下的上下文信息，从而提高模型对不同大小目标的识别和分割能力
         self.aspp_block = ASPPBlock(in_channels, aspp_dilate, aspp_out_channels=aspp_out_channels)
+
 
         self.classifier_conv_block = nn.Sequential(
             nn.Conv2d(
@@ -56,6 +59,7 @@ class DeepLabV3Plus(nn.Module):
 
         self._init_weights()
 
+    # 初始化模型中的参数权重
     def _init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -65,8 +69,12 @@ class DeepLabV3Plus(nn.Module):
                 nn.init.constant_(m.bias, 0)
         return
 
+
     def forward(self, encoded_features, block_1_features):
+        # 将block_1_features投影到与encoded_features相同的维度
         encoder_connection = self.projection_conv(block_1_features)
+
+        
         aspp_output_feature = self.aspp_block(encoded_features)
         aspp_output_feature = F.interpolate(
             aspp_output_feature, size=encoder_connection.shape[2:],

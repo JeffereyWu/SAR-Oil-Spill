@@ -15,8 +15,10 @@ class ResNet18DeepLabV3Plus(nn.Module):
 
     def forward(self, x):
         input_shape = x.shape[2:]
-        encoded_features = self.encoder(x)
-        x = self.segmenter(encoded_features, self.encoder.dict_encoder_features["block_1"])
+        encoded_features = self.encoder(x)  # 对输入数据进行编码
+        x = self.segmenter(encoded_features, self.encoder.dict_encoder_features["block_1"])     # 将编码后的特征传递给DeepLabV3+分割器进行分割
+
+        # 使用双线性插值将输出的特征图大小插值回输入大小
         x = F.interpolate(x, size=input_shape, mode="bilinear", align_corners=False)
         return x
 
