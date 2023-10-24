@@ -20,22 +20,28 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 class PolynomialLR(_LRScheduler):
     def __init__(self, optimizer, max_epochs, power=0.9, last_epoch=-1, min_lr=1e-6):
+        """
+        optimizer是优化器, max_epochs是最大的训练轮数, 
+        power是指数的值(通常取0.9), last_epoch是最后一个训练轮数, 
+        min_lr是最小的学习率(避免学习率衰减到零)
+        """
         self.power = power
         self.max_epochs = max_epochs
         self.min_lr = min_lr # avoid zero lr
         super(PolynomialLR, self).__init__(optimizer, last_epoch)
 
     def get_lr(self):
+        # 计算每个基础学习率（base_lr）的衰减值，确保学习率不会小于最小学习率（min_lr）
         return [ max( base_lr * ( 1 - self.last_epoch/self.max_epochs )**self.power, self.min_lr)
                 for base_lr in self.base_lrs]
 
 def validation_loop(dataset_loader, model, ce_loss, device):
     model.eval()
-    size = len(dataset_loader.dataset)
+    # size = len(dataset_loader.dataset)
     num_batches = len(dataset_loader)
     valid_loss, valid_acc, valid_IOU = 0, 0, 0
 
-    with torch.no_grad():
+    with torch.no_grad():       # 确保在该上下文中的操作不会进行梯度计算
         for image, label in dataset_loader:
             image = image.to(device, dtype=torch.float)
             label = label.to(device, dtype=torch.long)
@@ -55,21 +61,25 @@ def validation_loop(dataset_loader, model, ce_loss, device):
     return valid_loss, valid_acc, valid_IOU
 
 def train_loop(dataset_loader, model, ce_loss, optimizer, device):
+    # 模型中的层将启用权重更新和梯度计算
     model.train()
-    size = len(dataset_loader.dataset)
+
+    # size = len(dataset_loader.dataset)
     num_batches = len(dataset_loader)
     train_loss = 0
 
     for image, label in dataset_loader:
         image = image.to(device, dtype=torch.float)
         label = label.to(device, dtype=torch.long)
+
+        # 清除优化器中之前的梯度信息，确保梯度不会累积
         optimizer.zero_grad()
 
         pred_logits = model(image)
         loss = ce_loss(pred_logits, label)
 
         # Backpropagation
-        loss.backward()
+        loss.backward()     # 执行反向传播，计算损失相对于模型参数的梯度
         optimizer.step()
 
         train_loss += loss
@@ -77,16 +87,23 @@ def train_loop(dataset_loader, model, ce_loss, optimizer, device):
     return train_loss
 
 def batch_train(FLAGS):
+    # 这是一个用于存储模型文件和输出的目录
     dir_path = os.path.join(FLAGS.dir_model, FLAGS.which_model)
+    # dir_model: where to save the directory with trained checkpoint model files
+    # which_model: which model to train
+
     if not os.path.isdir(dir_path):
         os.makedirs(dir_path)
         print(f"created directory : {dir_path}")
+
+    # 用于记录训练过程中的指标数据
     csv_writer = CSVWriter(file_name=os.path.join(dir_path, "train_metrics.csv"),
         column_names=["epoch", "train_loss", "valid_loss", "valid_acc", "valid_IOU"])
 
     os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # 从指定的目录加载训练和验证数据集
     train_dataset_loader, valid_dataset_loader = get_dataloaders_for_training(
         FLAGS.dir_dataset, FLAGS.batch_size, random_state=FLAGS.random_state,
     )
@@ -134,28 +151,37 @@ def batch_train(FLAGS):
         lr_scheduler = PolynomialLR(
             optimizer, FLAGS.num_epochs+1, power=0.9,
         )
-    elif FLAGS.which_optimizer == "adamw":
+    elif FLAGS.which_optimizer == "adamw":      # "AdamW"优化器能够自适应地调整学习率
         optimizer = torch.optim.AdamW(
             oil_spill_seg_model.parameters(),
             lr=FLAGS.learning_rate,
             weight_decay=FLAGS.weight_decay,
         )
 
+    # 定义交叉熵损失函数，用于度量模型预测值与真实标签之间的差异
     ce_loss = torch.nn.CrossEntropyLoss()
+
     print(f"\ntraining oil spill segmentation model: {FLAGS.which_model}\n")
+
+    # 将存储在FLAGS变量中的训练参数以JSON格式写入文件params.json中
     write_dict_to_json(os.path.join(dir_path, "params.json"), vars(FLAGS))
+
     for epoch in range(1, FLAGS.num_epochs+1):
         t_1 = time.time()
         train_loss = train_loop(
             train_dataset_loader, oil_spill_seg_model, ce_loss, optimizer, device
         )
         t_2 = time.time()
+
         print("-"*100)
+        # 输出当前轮次的训练损失以及验证集上的损失、准确度和IOU
         print(f"Epoch : {epoch}/{FLAGS.num_epochs}, time: {(t_2-t_1):.2f} sec., train loss: {train_loss:.5f}")
         valid_loss, valid_acc, valid_IOU = validation_loop(
             valid_dataset_loader, oil_spill_seg_model, ce_loss, device
         )
         print(f"validation loss: {valid_loss:.5f}, validation accuracy: {valid_acc:.5f}, validation IOU: {valid_IOU:.5f}")
+
+        # 将每一轮的训练和验证指标以一行的形式写入CSV文件，以便进行后续分析和可视化
         csv_writer.write_row(
             [
                 epoch,
@@ -165,6 +191,7 @@ def batch_train(FLAGS):
                 round(valid_IOU, 5),
             ]
         )
+        # 保存当前训练轮次的模型参数
         torch.save(oil_spill_seg_model.state_dict(), os.path.join(dir_path, f"oil_spill_seg_{FLAGS.which_model}_{epoch}.pt"))
         if FLAGS.which_optimizer == "sgd":
             lr_scheduler.step()
@@ -192,8 +219,9 @@ def main():
         "efficientnet_v2_l_deeplab_v3",
     ]
 
+    # 创建一个参数解析器
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter          # 显示参数的默认值，以及关于如何使用这些参数的一些提示
     )
 
     parser.add_argument("--dir_dataset", default=dir_dataset,

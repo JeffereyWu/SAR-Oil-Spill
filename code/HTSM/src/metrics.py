@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# Use in validation loop
 # compute mean pixel accuracy
 def compute_mean_pixel_acc(true_label, pred_label):
 
@@ -38,6 +39,9 @@ def compute_mean_pixel_acc(true_label, pred_label):
     mean_pixel_accuracy = acc_sum / true_label.shape[0]
     return mean_pixel_accuracy
 
+
+
+# Use in validation loop 
 # compute mean IOU
 def compute_mean_IOU(true_label, pred_label, num_classes=5):
     iou_list = list()
@@ -61,7 +65,8 @@ def compute_mean_IOU(true_label, pred_label, num_classes=5):
     present_iou_list = np.array(present_iou_list)
     return np.mean(present_iou_list)
 
-def compute_class_IOU(true_label, pred_label, num_classes=5):
+# Use in inference loop
+def compute_class_IOU(true_label, pred_label, num_classes=4):
     iou_list = list()
     present_iou_list = list()
 

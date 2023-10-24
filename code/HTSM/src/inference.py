@@ -39,7 +39,7 @@ def inference_loop(dataset_loader, list_images, model, dir_labels, dir_masks, nu
         1: np.array([0, 255, 255]), # Cyan  - Oil Spill
         2: np.array([255, 0, 0]),   # Red   - Look-alike
         3: np.array([153, 76, 0]),  # Brown - Ship
-        4: np.array([0, 153, 0]),   # Green - Land
+        # 4: np.array([0, 153, 0]),   # Green - Land
     }
 
     cur_file_index = 0
@@ -55,7 +55,7 @@ def inference_loop(dataset_loader, list_images, model, dir_labels, dir_masks, nu
 
         # 计算准确率和类别的IOU。
         infer_acc += compute_mean_pixel_acc(label, pred_label)
-        infer_class_IOU_cur_sample = compute_class_IOU(label, pred_label)
+        infer_class_IOU_cur_sample = compute_class_IOU(label, pred_label, num_classes)
 
         # 将计算得到的IOU添加到数组中
         if len(infer_class_IOU) == 0:
