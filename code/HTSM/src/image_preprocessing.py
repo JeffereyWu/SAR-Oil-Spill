@@ -17,12 +17,20 @@ class ImagePadder:
         self._set_anchor_image_resized()
 
     def _set_anchor_image_resized(self):
+        # 获取锚定图像的形状
         anchor_image_shape = self._anchor_image.shape
         height, width = anchor_image_shape[0], anchor_image_shape[1]
+
+        # 计算目标图像的宽度和高度，包括填充
         target_width = self._pad_left + width + self._pad_right
         target_height = self._pad_top + height + self._pad_bottom
         #print(target_width, target_height)
+
+        # 使用cv2.resize对锚定图像进行调整大小
+        # 截取图像的水平位置从第260列开始，保持垂直维度不变
         self._anchor_image_resized = cv2.resize(self._anchor_image[:, 260:, :], (target_width, target_height), interpolation=cv2.INTER_LINEAR)
+
+        # 获取调整大小后的锚定图像的形状
         self._anchor_image_resized_shape = self._anchor_image_resized.shape
         #print(self._anchor_image_resized_shape)
         return
